@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitoramento de Salas - Controladores FACENS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .card {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .card.ligado {
+      border-left: 8px solid #28a745;
+      background-color: #d4edda;
+    }
+    .card.alerta {
+      border-left: 8px solid #ffc107;
+      background-color: #fff3cd;
+    }
+    .card.desligado {
+      border-left: 8px solid #6c757d;
+      background-color: #e9ecef;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <h1 class="text-center mb-4">Monitoramento dos Controladores de Sala</h1>
+    
+    <div id="cardsContainer" class="row g-4">
+      <!-- Os cards das salas serão adicionados dinamicamente -->
+    </div>
+  </div>
+
+  <script>
+    const salas = [
+      { nome: "Sala 404", ip: "http://172.17.56.71" },
+      { nome: "Sala 404", ip: "http://172.17.56.71" },
+      { nome: "Sala 404", ip: "http://172.17.56.71" },
+    ];
+
+    async function atualizarSalas() {
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = ""; // limpa os cards antes de atualizar
+
+      for (const sala of salas) {
+        try {
+          const resp = await fetch(`${sala.ip}/json`);
+          if (!resp.ok) throw new Error("Falha ao conectar");
+
+          const data = await resp.json();
+
+          let statusClasse = "desligado";
+          let statusTexto = "Desligado";
+
+          if (data.ar_condicionado === "ligado" && data.porta === "aberta") {
+            statusClasse = "alerta";
+            statusTexto = "⚠️ Ligado e porta aberta";
+          } else if (data.ar_condicionado === "ligado") {
+            statusClasse = "ligado";
+            statusTexto = "🟢 Ligado";
+          }
+
+          const card = `
+            <div class="col-md-4">
+              <div class="card ${statusClasse}">
+                <div class="card-body">
+                  <h5 class="card-title"> ${data.dispositivo ?? "--"}</h5>
+                  <p><strong>IP:</strong> ${sala.ip}</p>
+                  <p><strong>Status:</strong> ${statusTexto}</p>
+                  <p><strong>Temperatura:</strong> ${data.temperatura ?? "--"} °C</p>
+                  <p><strong>Porta:</strong> ${data.porta ?? "--"}</p>
+                  <p><strong>Presença:</strong> ${data.presenca ?? "--"}</p>
+                  ${
+                    data.ar_condicionado === "ligado"
+                      ? `<button class="btn btn-danger w-100" onclick="enviarComando('${sala.ip}', '${data.id_esp}')">Desligar Ar Condicionado</button>`
+                      : `<button class="btn btn-secondary w-100" disabled>Desligar Ar Condicionado</button>`
+                  }
+                </div>
+              </div>
+            </div>
+          `;
+          container.insertAdjacentHTML("beforeend", card);
+        } catch (err) {
+          const card = `
+            <div class="col-md-4">
+              <div class="card desligado">
+                <div class="card-body">
+                  <h5 class="card-title">${sala.nome}</h5>
+                  <p><strong>IP:</strong> ${sala.ip}</p>
+                  <p><strong>Status:</strong> 🚫 Sem conexão</p>
+                </div>
+              </div>
+            </div>
+          `;
+          container.insertAdjacentHTML("beforeend", card);
+        }
+      }
+    }
+
+    async function enviarComando(ip, id) {
+      const url = `${ip}/acao?token=${id}&comandos_serial=desligar`;
+      if (confirm("Deseja desligar o ar condicionado desta sala?")) {
+        try {
+          await fetch(url);
+          alert("Comando enviado com sucesso!");
+          atualizarSalas();
+        } catch (error) {
+          alert("Erro ao enviar comando!");
+        }
+      }
+    }
+
+    atualizarSalas();
+    setInterval(atualizarSalas, 20000); // atualiza a cada 10 segundos
+  </script>
+</body>
+</html>
